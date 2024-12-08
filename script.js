@@ -7,9 +7,10 @@ let playerPosition = 10;
 let playerSpeed = 0;
 let runningDistance = 0;
 let isGameRunning = false;
-let obstacles = [];
+let houses = [];
+let gapWidth = 200; // Abstand zwischen den Häusern
 let gameInterval;
-let obstacleInterval;
+let lastHousePosition = 0;
 
 // Funktion, um den Spieler zu bewegen
 function movePlayer() {
@@ -17,12 +18,12 @@ function movePlayer() {
     player.style.bottom = playerPosition + "px";
     playerPosition += playerSpeed;
 
-    // Gravitationswirkung
+    // Gravitationswirkung (Spieler fällt nach unten)
     if (playerPosition > 10) {
       playerSpeed = -1; // Fallgeschwindigkeit
     }
 
-    // Kollision mit dem Boden
+    // Kollision mit dem Boden (falls der Spieler den Boden erreicht)
     if (playerPosition <= 10) {
       playerPosition = 10;
       playerSpeed = 0;
@@ -36,11 +37,13 @@ function startGame() {
   playerPosition = 10;
   playerSpeed = 0;
   runningDistance = 0;
-  obstacles = [];
+  houses = [];
+  gapWidth = 200; // Der Abstand zwischen den Häusern
+  lastHousePosition = 0;
   scoreElement.textContent = `Meter gelaufen: ${runningDistance}`;
   messageElement.textContent = "Viel Spaß beim Spielen!";
   gameInterval = setInterval(gameLoop, 20);
-  obstacleInterval = setInterval(generateObstacle, 2000);
+  generateHouse();
 }
 
 // Spiel-Loop
@@ -48,51 +51,69 @@ function gameLoop() {
   movePlayer();
   runningDistance++;
   scoreElement.textContent = `Meter gelaufen: ${runningDistance}`;
-  checkCollisions();
-  moveObstacles();
+
+  // Generiere neue Häuser, wenn das letzte Haus das Ende erreicht hat
+  if (lastHousePosition < gameArea.offsetWidth - 100) {
+    generateHouse();
+  }
+
+  // Bewege die Häuser nach links
+  moveHouses();
+
+  // Überprüfe, ob der Spieler aus dem Spiel fällt
+  checkFall();
 }
 
-// Funktion, um Hindernisse zu generieren
-function generateObstacle() {
-  const obstacleHeight = Math.random() * 50 + 30;
-  const gapPosition = Math.random() * (gameArea.offsetHeight - obstacleHeight);
-  const obstacle = document.createElement("div");
-  obstacle.classList.add("obstacle");
-  obstacle.style.height = `${obstacleHeight}px`;
-  obstacle.style.left = `${gameArea.offsetWidth}px`;
-  obstacle.style.bottom = `${gapPosition}px`;
-  gameArea.appendChild(obstacle);
-  obstacles.push(obstacle);
+// Funktion, um ein Haus zu generieren
+function generateHouse() {
+  const house = document.createElement("div");
+  house.classList.add("house");
+
+  // Bestimme den Abstand zwischen den Häusern
+  const gap = Math.random() * (gapWidth - 100) + 100; // Variiert die Lücke zwischen den Häusern
+  house.style.left = `${lastHousePosition + gap}px`; // Positioniere das Haus
+  lastHousePosition = parseInt(house.style.left); // Speichere die Position des letzten Hauses
+
+  // Positioniere das Haus zufällig mit einer Lücke dazwischen
+  gameArea.appendChild(house);
+  houses.push(house);
 }
 
-// Funktion, um Hindernisse zu bewegen
-function moveObstacles() {
-  obstacles.forEach((obstacle, index) => {
-    let left = parseInt(obstacle.style.left);
-    left -= 3; // Geschwindigkeit der Hindernisse
-    obstacle.style.left = left + "px";
+// Funktion, um die Häuser zu bewegen
+function moveHouses() {
+  houses.forEach((house, index) => {
+    let left = parseInt(house.style.left);
+    left -= 3; // Geschwindigkeit der Häuser
 
-    if (left < -50) {
-      gameArea.removeChild(obstacle);
-      obstacles.splice(index, 1);
+    // Entferne Häuser, die aus dem Bildschirm raus sind
+    if (left < -100) {
+      gameArea.removeChild(house);
+      houses.splice(index, 1);
+    } else {
+      house.style.left = left + "px";
     }
   });
 }
 
-// Funktion, um Kollisionen zu überprüfen
-function checkCollisions() {
-  obstacles.forEach((obstacle) => {
-    const obstacleRect = obstacle.getBoundingClientRect();
+// Funktion, um zu überprüfen, ob der Spieler gefallen ist
+function checkFall() {
+  houses.forEach((house) => {
+    const houseRect = house.getBoundingClientRect();
     const playerRect = player.getBoundingClientRect();
 
     if (
-      playerRect.right > obstacleRect.left &&
-      playerRect.left < obstacleRect.right &&
-      playerRect.bottom > obstacleRect.top &&
-      playerRect.top < obstacleRect.bottom
+      playerRect.right > houseRect.left &&
+      playerRect.left < houseRect.right &&
+      playerRect.bottom < houseRect.top &&
+      playerRect.top > houseRect.top
     ) {
-      // Kollision erkannt, Spiel neu starten
-      endGame();
+      // Wenn der Spieler den Boden verfehlt, muss er fallen
+      if (playerRect.bottom <= houseRect.top) {
+        return;
+      } else {
+        // Kollision erkannt, Spiel neu starten
+        endGame();
+      }
     }
   });
 }
@@ -101,7 +122,6 @@ function checkCollisions() {
 function endGame() {
   isGameRunning = false;
   clearInterval(gameInterval);
-  clearInterval(obstacleInterval);
   messageElement.textContent = `Du bist gefallen! Du bist ${runningDistance} Meter gelaufen. Drücke 'Space', um neu zu starten.`;
 }
 
